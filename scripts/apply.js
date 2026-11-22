@@ -1,4 +1,6 @@
-import { importFromCompendium } from "./packs.js";
+import { availabilityOf } from "./avail.js";
+import { reportChange, requestPurchaseApproval } from "./chat.js";
+import { collectionFor, importFromCompendium } from "./packs.js";
 
 export function readKarma(actor) {
     return Number(actor?.system?.karma) || 0;
@@ -29,8 +31,8 @@ export function costToRaise(current) {
 }
 
 export async function spendKarma(actor, amount, reason = "") {
-    if (!actor?.isOwner) {
-        ui.notifications.warn("Only an owner can spend Karma on this character.");
+    if (!actor?.isOwner && !game.user.isGM) {
+        ui.notifications.warn("Only an owner or GM can spend Karma on this character.");
         return false;
     }
     const cost = Math.max(0, Math.floor(Number(amount) || 0));
@@ -41,7 +43,6 @@ export async function spendKarma(actor, amount, reason = "") {
         return false;
     }
     await actor.update({ "system.karma": have - cost });
-    if (reason) ui.notifications.info(`${actor.name}: −${cost} Karma (${reason}).`);
     return true;
 }
 
@@ -62,8 +63,8 @@ export async function awardKarma(actor, amount) {
 }
 
 export async function spendNuyen(actor, amount, reason = "") {
-    if (!actor?.isOwner) {
-        ui.notifications.warn("Only an owner can spend nuyen on this character.");
+    if (!actor?.isOwner && !game.user.isGM) {
+        ui.notifications.warn("Only an owner or GM can spend nuyen on this character.");
         return false;
     }
     const cost = Math.max(0, Math.floor(Number(amount) || 0));
@@ -74,7 +75,6 @@ export async function spendNuyen(actor, amount, reason = "") {
         return false;
     }
     await actor.update({ "system.nuyen": have - cost });
-    if (reason) ui.notifications.info(`${actor.name}: −${cost.toLocaleString()}¥ (${reason}).`);
     return true;
 }
 
@@ -103,6 +103,11 @@ export async function raiseSkill(actor, skillId) {
     const cost = costToRaise(current);
     if (!(await spendKarma(actor, cost, `${labelSkill(skillId)} ${current}→${current + 1}`))) return false;
     await actor.update({ [`system.skills.${skillId}.points`]: current + 1 });
+    await reportChange({
+        actor,
+        title: "Karma — skill",
+        lines: [`${labelSkill(skillId)} ${current} → ${current + 1}`, `−${cost} Karma`],
+    });
     return true;
 }
 
@@ -120,8 +125,14 @@ export async function setSpecialization(actor, skillId, name, asExpertise = fals
             return false;
         }
         if (!(await spendKarma(actor, 5, `Expertise: ${name || skill.specialization}`))) return false;
+        const expertise = name || skill.specialization;
         await actor.update({
-            [`system.skills.${skillId}.expertise`]: name || skill.specialization,
+            [`system.skills.${skillId}.expertise`]: expertise,
+        });
+        await reportChange({
+            actor,
+            title: "Karma — expertise",
+            lines: [`${labelSkill(skillId)}: ${expertise}`, "−5 Karma"],
         });
         return true;
     }
@@ -137,6 +148,11 @@ export async function setSpecialization(actor, skillId, name, asExpertise = fals
     } else {
         await actor.update({ [`system.skills.${skillId}.specialization`]: name });
     }
+    await reportChange({
+        actor,
+        title: "Karma — specialization",
+        lines: [`${labelSkill(skillId)}: ${name}`, "−5 Karma"],
+    });
     return true;
 }
 
@@ -160,6 +176,11 @@ export async function raiseAttribute(actor, attrId) {
         const cost = costToRaise(current);
         if (!(await spendKarma(actor, cost, `Edge ${current}→${current + 1}`))) return false;
         await actor.update({ "system.attributes.edg.max": current + 1 });
+        await reportChange({
+            actor,
+            title: "Karma — attribute",
+            lines: [`Edge ${current} → ${current + 1}`, `−${cost} Karma`],
+        });
         return true;
     }
     const current = Number(attr.base) || 0;
@@ -170,6 +191,11 @@ export async function raiseAttribute(actor, attrId) {
     const cost = costToRaise(current);
     if (!(await spendKarma(actor, cost, `${labelAttr(attrId)} ${current}→${current + 1}`))) return false;
     await actor.update({ [`system.attributes.${attrId}.base`]: current + 1 });
+    await reportChange({
+        actor,
+        title: "Karma — attribute",
+        lines: [`${labelAttr(attrId)} ${current} → ${current + 1}`, `−${cost} Karma`],
+    });
     return true;
 }
 
@@ -180,6 +206,11 @@ export async function raiseInitiation(actor) {
     const cost = 10 + grade;
     if (!(await spendKarma(actor, cost, `Initiate grade ${grade}→${grade + 1}`))) return false;
     await actor.update({ "system.attributes.mag.initiation": grade + 1 });
+    await reportChange({
+        actor,
+        title: "Karma — initiation",
+        lines: [`Initiate grade ${grade} → ${grade + 1}`, `−${cost} Karma`],
+    });
     return true;
 }
 
@@ -190,13 +221,28 @@ export async function raiseSubmersion(actor) {
     const cost = 10 + level;
     if (!(await spendKarma(actor, cost, `Submersion ${level}→${level + 1}`))) return false;
     await actor.update({ "system.attributes.res.submersion": level + 1 });
+    await reportChange({
+        actor,
+        title: "Karma — submersion",
+        lines: [`Submersion ${level} → ${level + 1}`, `−${cost} Karma`],
+    });
     return true;
 }
 
 export async function buyCatalogWithKarma(actor, packKey, documentId, karmaCost, label) {
     const cost = Number(karmaCost) || 0;
     if (cost > 0 && !(await spendKarma(actor, cost, label || "Catalog"))) return null;
-    return importFromCompendium(actor, packKey, documentId);
+    const created = await importFromCompendium(actor, packKey, documentId);
+    if (!created) {
+        if (cost > 0) await actor.update({ "system.karma": readKarma(actor) + cost });
+        return null;
+    }
+    await reportChange({
+        actor,
+        title: "Karma — catalog",
+        lines: [`Added ${created.name}`, cost ? `−${cost} Karma` : "No Karma charged"],
+    });
+    return created;
 }
 
 /** Buy off a disadvantage: 2 × listed Karma value, then delete the quality item. */
@@ -210,15 +256,118 @@ export async function removeQuality(actor, itemId) {
         return false;
     }
     if (!(await spendKarma(actor, cost, `Buy off ${item.name}`))) return false;
+    const name = item.name;
     await item.delete();
-    ui.notifications.info(`${item.name} removed (−${cost} Karma).`);
+    await reportChange({
+        actor,
+        title: "Karma — buy off quality",
+        lines: [`Removed ${name}`, `−${cost} Karma (2 × listed ${listed})`],
+    });
     return true;
 }
 
-export async function buyCatalogWithNuyen(actor, packKey, documentId, price, label) {
-    const cost = Number(price) || 0;
-    if (cost > 0 && !(await spendNuyen(actor, cost, label || "Purchase"))) return null;
-    return importFromCompendium(actor, packKey, documentId);
+/**
+ * @param {object} [options]
+ * @param {string} [options.attachToUuid] Host weapon uuid for mods
+ * @param {string} [options.attachToName]
+ * @param {"buy"|"buy-mod"|"buy-ammo"} [options.mode]
+ * @returns {Promise<Item|{{pending:true}}|null>}
+ */
+export async function buyCatalogWithNuyen(actor, packKey, documentId, price, label, options = {}) {
+    const collection = collectionFor(packKey);
+    if (!collection) {
+        ui.notifications.warn("Enable shadowrun-data before adding a catalog item.");
+        return null;
+    }
+    const document = await collection.getDocument(documentId);
+    if (!document) {
+        ui.notifications.warn("That catalog entry could not be loaded.");
+        return null;
+    }
+    const cost = Number(price) || Number(document.system?.price) || 0;
+    const avail = availabilityOf(document.system);
+    const payload = {
+        actorUuid: actor.uuid,
+        actorName: actor.name,
+        pack: packKey,
+        documentId,
+        price: cost,
+        label: label || document.name,
+        availLabel: avail.label,
+        attachToUuid: options.attachToUuid || null,
+        attachToName: options.attachToName || null,
+        mode: options.mode || "buy",
+    };
+
+    if (!avail.ready && !game.user.isGM) {
+        if (readNuyen(actor) < cost) {
+            ui.notifications.warn(`${actor.name} has ${readNuyen(actor).toLocaleString()}¥; this costs ${cost.toLocaleString()}¥.`);
+            return null;
+        }
+        await requestPurchaseApproval(payload);
+        ui.notifications.info("Purchase posted to chat for GM approval. Nuyen is not spent yet.");
+        return { pending: true };
+    }
+
+    return finalizeNuyenPurchase(actor, payload, { gmBypass: game.user.isGM && !avail.ready });
+}
+
+/** Called from chat Approve button. */
+export async function completePendingPurchase(payload) {
+    const doc = await fromUuid(payload.actorUuid);
+    const actor = doc?.actor ?? doc;
+    if (!actor || actor.documentName !== "Actor") return null;
+    return finalizeNuyenPurchase(actor, payload, { fromApproval: true });
+}
+
+async function finalizeNuyenPurchase(actor, payload, meta = {}) {
+    if (!actor?.isOwner && !game.user.isGM) {
+        ui.notifications.warn("Only an owner or GM can complete this purchase.");
+        return null;
+    }
+    const cost = Number(payload.price) || 0;
+    if (cost > 0 && !(await spendNuyen(actor, cost, payload.label))) return null;
+    const created = await importFromCompendium(actor, payload.pack, payload.documentId);
+    if (!created) {
+        if (cost > 0) await actor.update({ "system.nuyen": readNuyen(actor) + cost });
+        return null;
+    }
+
+    const lines = [
+        `${created.name} (−${cost.toLocaleString()}¥)`,
+        payload.availLabel || "",
+    ];
+    if (meta.gmBypass) lines.push("GM purchased a non-ready item (self-approved).");
+    if (meta.fromApproval) lines.push("GM approved the Availability find.");
+
+    if (payload.attachToUuid && created.type === "mod") {
+        const host = await resolveActorItem(actor, payload.attachToUuid);
+        if (host) {
+            await created.update({ "system.embeddedInUuid": host.uuid });
+            lines.push(`Attached to ${host.name}.`);
+        }
+    } else if (payload.mode === "buy-ammo" && payload.attachToName) {
+        lines.push(`Bought for use with ${payload.attachToName}.`);
+    }
+
+    await reportChange({
+        actor,
+        title: payload.mode === "buy-mod" ? "Purchase — weapon mod"
+            : payload.mode === "buy-ammo" ? "Purchase — ammunition"
+                : "Purchase",
+        lines: lines.filter(Boolean),
+        tone: meta.fromApproval ? "ok" : "ok",
+    });
+    return created;
+}
+
+async function resolveActorItem(actor, uuid) {
+    if (!uuid) return null;
+    if (uuid.includes(actor.id) || uuid.startsWith("Actor.")) {
+        const parsed = foundry.utils.parseUuid(uuid);
+        return actor.items.get(parsed.id) || await fromUuid(uuid);
+    }
+    return actor.items.get(uuid) || await fromUuid(uuid);
 }
 
 export async function createContact(actor, { name, rating = 1, loyalty = 1, type = "" } = {}) {
@@ -234,6 +383,11 @@ export async function createContact(actor, { name, rating = 1, loyalty = 1, type
             description: "",
         },
     }]);
+    await reportChange({
+        actor,
+        title: "Contact added",
+        lines: [`${created.name} · Connection ${created.system.rating} · Loyalty ${created.system.loyalty}`],
+    });
     return created;
 }
 
@@ -246,6 +400,11 @@ export async function updateContact(actor, itemId, patch) {
     if (patch.name != null) data.name = String(patch.name);
     if (patch.type != null) data["system.type"] = String(patch.type);
     await item.update(data);
+    await reportChange({
+        actor,
+        title: "Contact updated",
+        lines: [`${item.name} · Connection ${item.system.rating} · Loyalty ${item.system.loyalty}`],
+    });
     return true;
 }
 
@@ -260,6 +419,11 @@ export async function createSin(actor, { name, quality = "FAKE_SIN" } = {}) {
             description: "",
         },
     }]);
+    await reportChange({
+        actor,
+        title: "SIN added",
+        lines: [`${created.name} (${created.system.quality})`],
+    });
     return created;
 }
 
@@ -292,7 +456,13 @@ export async function payLifestyleMonth(actor, itemId) {
     if (!item || item.type !== "lifestyle") return false;
     const cost = Number(item.system.cost) || 0;
     if (!(await spendNuyen(actor, cost, `${item.name} rent`))) return false;
-    await item.update({ "system.paid": (Number(item.system.paid) || 0) + 1 });
+    const paid = (Number(item.system.paid) || 0) + 1;
+    await item.update({ "system.paid": paid });
+    await reportChange({
+        actor,
+        title: "Lifestyle rent",
+        lines: [`${item.name}: paid month ${paid}`, `−${cost.toLocaleString()}¥`],
+    });
     return true;
 }
 
@@ -304,8 +474,14 @@ export async function removeAugmentation(actor, itemId) {
         ui.notifications.warn("That gear has no Essence cost; delete it from the sheet if you want it gone.");
         return false;
     }
+    const name = item.name;
     await item.delete();
-    ui.notifications.info(`${item.name} removed. Essence returns when the sheet recalculates. Surgery time is a table call.`);
+    await reportChange({
+        actor,
+        title: "Augmentation removed",
+        lines: [`${name} (Essence ${essence})`, "Surgery time is a table call."],
+        tone: "warn",
+    });
     return true;
 }
 
@@ -335,22 +511,53 @@ export async function installSoftware(actor, softwareId, deviceId) {
         return false;
     }
     await software.update({ "system.embeddedInUuid": device.uuid });
-    ui.notifications.info(`${software.name} is now running on ${device.name}.`);
+    await reportChange({
+        actor,
+        title: "Program installed",
+        lines: [`${software.name} → ${device.name}`],
+    });
     return true;
 }
 
 export async function uninstallSoftware(actor, softwareId) {
     const software = actor?.items?.get(softwareId);
     if (!software || software.type !== "software" || !actor.isOwner) return false;
+    const name = software.name;
     await software.update({ "system.embeddedInUuid": null });
-    ui.notifications.info(`${software.name} is no longer slotted on a device.`);
+    await reportChange({
+        actor,
+        title: "Program uninstalled",
+        lines: [`${name} removed from its device`],
+    });
     return true;
 }
 
 export async function deleteItem(actor, itemId) {
     const item = actor?.items?.get(itemId);
     if (!item || !actor.isOwner) return false;
+    const name = item.name;
+    const type = item.type;
     await item.delete();
+    await reportChange({
+        actor,
+        title: "Item removed",
+        lines: [`${name} (${type})`],
+        tone: "warn",
+    });
+    return true;
+}
+
+/** Attach an already-owned mod item to a weapon. */
+export async function attachModToWeapon(actor, modId, weaponId) {
+    const mod = actor?.items?.get(modId);
+    const weapon = actor?.items?.get(weaponId);
+    if (!mod || mod.type !== "mod" || !weapon || !actor.isOwner) return false;
+    await mod.update({ "system.embeddedInUuid": weapon.uuid });
+    await reportChange({
+        actor,
+        title: "Weapon mod attached",
+        lines: [`${mod.name} → ${weapon.name}`],
+    });
     return true;
 }
 

@@ -609,6 +609,41 @@
     font-size: 0.9rem;
 }
 
+.sr6-char-wizard .sr6cw-awards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 0.55rem 0.7rem;
+    margin: 0.35rem 0 0.9rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.sr6-char-wizard .sr6cw-award-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary, #c9c3b6);
+}
+
+.sr6-char-wizard .sr6cw-award-field input {
+    width: 100%;
+    min-height: 2rem;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.95rem;
+}
+
+.sr6-char-wizard .sr6cw-award-apply {
+    align-self: end;
+    min-height: 2rem;
+}
+
 /* Token toolbar — amber so it reads apart from the cyan turn wizard */
 #scene-controls-tools button.tool[data-tool="sr6CharWizard"] {
     color: #e0b15a;
@@ -617,4 +652,52 @@
 #scene-controls-tools button.tool[data-tool="sr6CharWizard"]:hover,
 #scene-controls-tools button.tool[data-tool="sr6CharWizard"].active {
     color: #f0c878;
+}
+
+/* Chat cards (global — they live in the chat log, not the app window) */
+.sr6cw-chat {
+    margin: 0.15rem 0;
+    padding: 0.45rem 0.55rem;
+    border-left: 3px solid #7f9cb8;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.sr6cw-chat-ok { border-left-color: #6a9a72; }
+.sr6cw-chat-warn { border-left-color: #c4963a; }
+.sr6cw-chat-pending { border-left-color: #c4963a; }
+.sr6cw-chat-deny { border-left-color: #b06060; }
+
+.sr6cw-chat-head {
+    margin: 0 0 0.2rem;
+}
+
+.sr6cw-chat-who,
+.sr6cw-chat-foot {
+    margin: 0;
+    color: var(--color-text-secondary, #c9c3b6);
+    font-size: 0.85rem;
+}
+
+.sr6cw-chat-list {
+    margin: 0.35rem 0;
+    padding-left: 1.1rem;
+}
+
+.sr6cw-chat-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+
+.sr6cw-chat-btn {
+    min-height: 1.8rem;
+    padding: 0.15rem 0.55rem;
+}
+
+.sr6cw-chat-btn.ok {
+    background: rgba(106, 154, 114, 0.35);
+}
+
+.sr6cw-chat-btn.deny {
+    background: rgba(176, 96, 96, 0.35);
 }

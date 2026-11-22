@@ -1,6 +1,6 @@
 # Plan: `sr6-char-wizard` (character maintenance)
 
-**Status:** Module [`sr6-char-wizard/`](../../sr6-char-wizard/) version **0.1.0** — first ApplicationV2 pass for doors A–G. This file remains the living rules inventory. Cite printed pages; summarize in original wording; do not transcribe the PDFs.
+**Status:** Module [`sr6-char-wizard/`](../../sr6-char-wizard/) version **0.1.1** — doors A–G plus chat reports, GM Approval for non-ready buys, weapon outfit (mods/ammo), and a dedicated session-awards form (Heat/Rep fields stubbed for later). Cite printed pages; summarize in original wording; do not transcribe the PDFs.
 
 **Purpose:** Post-run upgrades and sheet maintenance for characters that already exist in Foundry. Replaces the Commlink export/import loop for Karma spends, gear buys, contacts/SINs, cyberware, programs, session awards, and hygiene. **Not** a character-creation / priority / point-buy / life-path wizard — that stays in [`../rules/character-creation.md`](../../docs/rules/character-creation.md).
 

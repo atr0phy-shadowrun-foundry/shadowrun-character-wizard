@@ -1,8 +1,10 @@
+import { registerChatHooks } from "./chat.js";
 import { CharWizard } from "./wizard.js";
 
 const MODULE = "sr6-char-wizard";
 
 Hooks.once("init", () => {
+    registerChatHooks();
     game.settings.register(MODULE, "macroId", {
         scope: "world",
         config: false,

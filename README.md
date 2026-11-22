@@ -1,6 +1,6 @@
 # Shadowrun Character Wizard
 
-Foundry module `sr6-char-wizard` version 0.1.0.
+Foundry module `sr6-char-wizard` version 0.1.1.
 
 Post-generation maintenance for runners who already exist on the Eden sheet: spend Karma and nuyen after a run, update contacts and SINs, install or remove cyberware, reshuffle deck/RCC programs, let the GM award session rewards, and scan the sheet for hygiene issues. It is not a character-creation or priority wizard.
 
@@ -20,11 +20,12 @@ Enable beside Eden and `shadowrun-data`. Open from the token toolbar (amber user
 ## v1 doors
 
 - Spend Karma (skills, attributes, specs, initiation/submersion, qualities, spells, forms)
-- Spend nuyen (catalog buy from shadowrun-data)
+- Spend nuyen (catalog buy from shadowrun-data; non-ready Availability asks GM in chat first)
+- Outfit a weapon (mods auto-attach; ammo for that gun)
 - Contacts, SINs, lifestyle rent
 - Cyberware / bioware install (buy) and uninstall
 - Deck / RCC program slotting
-- GM session awards (Karma / nuyen)
+- GM session awards (Karma / nuyen / Heat / Reputation)
 - Sheet hygiene scan
 
-Rules inventory: [`docs/SCOPE.md`](docs/SCOPE.md).
+Every finalized change posts a chat card for the table. Rules inventory: [`docs/SCOPE.md`](docs/SCOPE.md).

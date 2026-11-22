@@ -56,6 +56,28 @@
         {{/if}}
         {{#if notice}}<p class="sr6cw-notice">{{notice}}</p>{{/if}}
 
+        {{#if awardsForm}}
+        <div class="sr6cw-awards">
+            <label class="sr6cw-award-field">
+                <span>Karma</span>
+                <input type="number" name="awardKarma" value="{{awardsForm.karma}}" step="1">
+            </label>
+            <label class="sr6cw-award-field">
+                <span>Nuyen</span>
+                <input type="number" name="awardNuyen" value="{{awardsForm.nuyen}}" step="100">
+            </label>
+            <label class="sr6cw-award-field">
+                <span>Heat</span>
+                <input type="number" name="awardHeat" value="{{awardsForm.heat}}" step="1">
+            </label>
+            <label class="sr6cw-award-field">
+                <span>Reputation</span>
+                <input type="number" name="awardReputation" value="{{awardsForm.reputation}}" step="1">
+            </label>
+            <button type="button" class="sr6cw-award-apply" data-action="search">Apply amounts</button>
+        </div>
+        {{/if}}
+
         {{#if search}}
         <div class="sr6cw-search">
             {{#if search.field}}
@@ -96,6 +118,8 @@
                     {{#if deviceId}}data-device-id="{{deviceId}}"{{/if}}
                     {{#if awardKarma}}data-award-karma="{{awardKarma}}"{{/if}}
                     {{#if awardNuyen}}data-award-nuyen="{{awardNuyen}}"{{/if}}
+                    {{#if awardHeat}}data-award-heat="{{awardHeat}}"{{/if}}
+                    {{#if awardReputation}}data-award-reputation="{{awardReputation}}"{{/if}}
                     {{#if disabled}}disabled{{/if}}>
                     <span class="sr6cw-choice-copy">
                         <span class="sr6cw-choice-label">{{label}}</span>

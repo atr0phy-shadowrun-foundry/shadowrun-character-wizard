@@ -10,8 +10,10 @@ import {
     readNuyen,
     skillRank,
 } from "./apply.js";
+import { availabilityOf } from "./avail.js";
 import { packLabel, searchPack } from "./packs.js";
 import { scanSheet } from "./hygiene.js";
+import { ammoRelevance, modsOnWeapon, sortAmmoForWeapon, weaponList } from "./weapons.js";
 
 const ATTRS = ["bod", "agi", "rea", "str", "wil", "log", "int", "cha", "edg", "mag", "res"];
 
@@ -65,6 +67,10 @@ async function renderPage(state, actor) {
     if (id === "contacts") return contactsPage(actor, state.data);
     if (id === "buy") return buyHub(actor);
     if (id === "buy-search") return catalogBuyPage(actor, state.data, "nuyen");
+    if (id === "weapon") return weaponHub(actor);
+    if (id === "weapon-detail") return weaponDetail(actor, state.data);
+    if (id === "weapon-mods") return weaponCatalog(actor, state.data, "weaponMods");
+    if (id === "weapon-ammo") return weaponCatalog(actor, state.data, "ammunition");
     if (id === "cyber") return cyberPage(actor, state.data);
     if (id === "programs") return programsPage(actor, state.data);
     if (id === "awards") return awardsPage(actor, state.data);
@@ -87,8 +93,11 @@ function homePage(actor) {
                     choice("Spend Karma", `${karma} available. Skills, attributes, qualities, spells, initiation.`, {
                         go: "karma", badge: String(karma), cite: core(68),
                     }),
-                    choice("Spend nuyen", `${nuyen.toLocaleString()}¥. Gear from shadowrun-data, with attach offers after weapons.`, {
+                    choice("Spend nuyen", `${nuyen.toLocaleString()}¥. Gear from shadowrun-data.`, {
                         go: "buy", badge: `${nuyen.toLocaleString()}¥`, cite: core(246),
+                    }),
+                    choice("Outfit a weapon", "Mods and ammo for a gun already on the sheet, with auto-attach for mods.", {
+                        go: "weapon", cite: core(246),
                     }),
                     choice("Contacts & SINs", "Connection, Loyalty, fake SINs, lifestyle months.", {
                         go: "contacts", cite: core(50),
@@ -454,14 +463,17 @@ function buyHub(actor) {
     return {
         kicker: "Nuyen",
         title: "What are you buying?",
-        lead: `${readNuyen(actor).toLocaleString()}¥ on hand. Availability and finding a seller stay a table call; the wizard charges the listed price.`,
+        lead: `${readNuyen(actor).toLocaleString()}¥ on hand. Readily available goods debit immediately. Anything with an Availability rating posts a chat card for GM approval first.`,
         leadCite: core(246),
         groups: [{
             choices: [
-                choice("Weapons", packLabel("weapons"), { go: "buy-search", pack: "weapons", cite: core(246) }),
-                choice("Ammunition", packLabel("ammunition"), { go: "buy-search", pack: "ammunition" }),
+                choice("Weapons", "After purchase you can outfit the new weapon with mods and ammo.", {
+                    go: "buy-search", pack: "weapons", cite: core(246),
+                }),
+                choice("Outfit a weapon on the sheet", "Pick an owned weapon, then browse matching mods or ammo.", {
+                    go: "weapon", cite: core(259),
+                }),
                 choice("Armor", packLabel("armor"), { go: "buy-search", pack: "armor" }),
-                choice("Weapon mods", packLabel("weaponMods"), { go: "buy-search", pack: "weaponMods" }),
                 choice("Gear", packLabel("gear"), { go: "buy-search", pack: "gear" }),
                 choice("Software", packLabel("software"), { go: "buy-search", pack: "software", cite: core(184) }),
                 choice("Vehicles", packLabel("vehicles"), { go: "buy-search", pack: "vehicles" }),
@@ -469,6 +481,118 @@ function buyHub(actor) {
                 choice("Augmentations", "Prefer the Cyberware door so Essence is obvious.", {
                     go: "cyber", cite: core(282),
                 }),
+            ],
+        }],
+    };
+}
+
+function weaponHub(actor) {
+    const weapons = weaponList(actor);
+    return {
+        kicker: "Weapons",
+        title: "Which weapon?",
+        lead: "Pick a weapon already on the sheet. You can buy mods (auto-attached) or ammo stocked for that piece.",
+        leadCite: core(259),
+        groups: [{
+            choices: weapons.length ? weapons.map((item) => {
+                const fitted = modsOnWeapon(actor, item).length;
+                return choice(item.name, `${item.system.subtype || item.system.type || "Weapon"}${fitted ? ` · ${fitted} mod(s)` : ""}`, {
+                    go: "weapon-detail", itemId: item.id, cite: core(259),
+                });
+            }) : [choice("No weapons on the sheet", "Buy one under Spend nuyen → Weapons.", {
+                go: "buy-search", pack: "weapons",
+            })],
+        }],
+    };
+}
+
+function weaponDetail(actor, data) {
+    const weapon = actor.items.get(data.itemId);
+    if (!weapon) return weaponHub(actor);
+    const fitted = modsOnWeapon(actor, weapon);
+    return {
+        kicker: weapon.name,
+        title: "Outfit this weapon",
+        lead: `${weapon.system.subtype || weapon.system.type || "Weapon"}. Mods attach via Eden’s embedded link; ammo is added to the sheet for this gun.`,
+        leadCite: core(259),
+        groups: [
+            {
+                heading: "Buy for this weapon",
+                choices: [
+                    choice("Weapon mods", "Search catalog, pay, auto-attach to this weapon.", {
+                        go: "weapon-mods", itemId: weapon.id, pack: "weaponMods", cite: core(259),
+                    }),
+                    choice("Ammunition", "Matching ammo sorted first; added to inventory for this weapon.", {
+                        go: "weapon-ammo", itemId: weapon.id, pack: "ammunition", cite: core(250),
+                    }),
+                ],
+            },
+            {
+                heading: "Already attached",
+                choices: fitted.length ? fitted.map((item) => choice(
+                    item.name,
+                    "Installed mod",
+                    { action: "open-item", itemId: item.id },
+                )) : [choice("No mods attached", "", { disabled: true })],
+            },
+        ],
+    };
+}
+
+async function weaponCatalog(actor, data, packKey) {
+    const weapon = actor.items.get(data.itemId);
+    if (!weapon) return weaponHub(actor);
+    const query = data.query || "";
+    const result = await searchPack(packKey, { query, limit: 40 });
+    let entries = result.entries || [];
+    const isAmmo = packKey === "ammunition";
+    if (isAmmo) entries = sortAmmoForWeapon(entries, weapon);
+
+    const choices = entries.map((entry) => {
+        const avail = availabilityOf({ avail: entry.avail });
+        const price = entry.price || 0;
+        const can = readNuyen(actor) >= price;
+        const relevance = isAmmo ? ammoRelevance(entry, weapon) : "exact";
+        const hintBits = [
+            entry.hint,
+            !avail.ready ? "Needs GM approval" : "",
+            isAmmo && relevance === "exact" ? "Likely match" : "",
+            isAmmo && relevance === "other" ? "Check caliber/type" : "",
+        ].filter(Boolean);
+        return choice(entry.name, hintBits.join(" · "), {
+            action: isAmmo ? "buy-ammo" : "buy-mod",
+            pack: packKey,
+            documentId: entry.id,
+            itemId: weapon.id,
+            price: String(price),
+            badge: !avail.ready && !game.user.isGM
+                ? (can ? "Ask GM" : "Blocked")
+                : (can ? `−${price.toLocaleString()}¥` : "Blocked"),
+            dim: !can,
+        });
+    });
+
+    return {
+        kicker: weapon.name,
+        title: isAmmo ? "Ammunition" : "Weapon mods",
+        lead: result.missing
+            ? "shadowrun-data is not enabled."
+            : result.short
+                ? "Type at least two letters, then Apply."
+                : isAmmo
+                    ? "Likely matches are listed first. Ammo is added to the sheet tagged for this weapon."
+                    : "Buying a mod attaches it to this weapon automatically.",
+        leadCite: isAmmo ? core(250) : core(259),
+        notice: "Items with an Availability rating go to chat for GM approval before nuyen is spent.",
+        search: {
+            query,
+            placeholder: `Search ${packLabel(packKey)}`,
+            pack: packKey,
+        },
+        groups: [{
+            heading: "Catalog",
+            choices: choices.length ? choices : [
+                choice("No matches", "Try another query.", { disabled: true }),
             ],
         }],
     };
@@ -487,14 +611,23 @@ async function catalogBuyPage(actor, data, payWith) {
             else if (entry.karma > 0) price = entry.karma * 2;
             else price = 5;
         }
+        const avail = payWith === "nuyen" ? availabilityOf({ avail: entry.avail }) : { ready: true, label: "" };
         const can = payWith === "karma" ? readKarma(actor) >= price : readNuyen(actor) >= price;
-        const hint = [entry.hint, entry.avail != null && entry.avail !== "" ? `Avail ${entry.avail}` : ""].filter(Boolean).join(" · ");
+        const hint = [
+            entry.hint,
+            payWith === "nuyen" && !avail.ready ? "Needs GM approval" : "",
+        ].filter(Boolean).join(" · ");
+        let badge = "Blocked";
+        if (can) {
+            if (payWith === "nuyen" && !avail.ready && !game.user.isGM) badge = "Ask GM";
+            else badge = payWith === "karma" ? `−${price}` : `−${price.toLocaleString()}¥`;
+        }
         return choice(entry.name, hint || entry.type, {
             action: payWith === "karma" ? "buy-karma" : "buy-nuyen",
             pack,
             documentId: entry.id,
             price: String(price),
-            badge: can ? `−${payWith === "karma" ? price : price.toLocaleString()}${payWith === "karma" ? "" : "¥"}` : "Blocked",
+            badge,
             dim: !can,
         });
     });
@@ -504,10 +637,12 @@ async function catalogBuyPage(actor, data, payWith) {
         lead: result.missing
             ? "shadowrun-data is not enabled."
             : result.short
-                ? "Type at least two letters, then Search."
-                : `${choices.length} matches. Soft warning: Availability is not a hard stop.`,
+                ? "Type at least two letters, then Apply."
+                : `${choices.length} matches.`,
         leadCite: payWith === "karma" ? core(68) : core(246),
-        notice: payWith === "nuyen" ? "Restricted or illegal codes are a table call. The wizard still allows the purchase if you can pay." : "",
+        notice: payWith === "nuyen"
+            ? "Readily available goods spend immediately. Anything with an Availability rating asks the GM in chat first."
+            : "",
         search: {
             query,
             placeholder: `Search ${packLabel(pack)}`,
@@ -661,31 +796,42 @@ function awardsPage(actor, data) {
         };
     }
     const party = game.actors.filter((entry) => entry.hasPlayerOwner && entry.type === "Player");
-    const karmaAmt = Number(data.awardKarma) || 5;
-    const nuyenAmt = Number(data.awardNuyen) || 0;
+    const karmaAmt = Number(data.awardKarma ?? 5);
+    const nuyenAmt = Number(data.awardNuyen ?? 0);
+    const heatAmt = Number(data.awardHeat ?? 0);
+    const repAmt = Number(data.awardReputation ?? 0);
     return {
         kicker: "GM",
         title: "Session awards",
-        lead: "Core guidance: about 5 Karma is one meaningful improvement. Cash is usually offered per runner.",
+        lead: "Core guidance: about 5 Karma is one meaningful improvement. Cash is usually offered per runner. Heat and Reputation fields are ready for later session tracking.",
         leadCite: core(243),
-        search: {
-            query: String(data.awardKarma ?? "5"),
-            placeholder: "Karma to award",
-            field: "awardKarma",
-            secondQuery: String(data.awardNuyen ?? "0"),
-            secondPlaceholder: "Nuyen to award",
-            secondField: "awardNuyen",
+        awardsForm: {
+            karma: String(Number.isFinite(karmaAmt) ? karmaAmt : 5),
+            nuyen: String(Number.isFinite(nuyenAmt) ? nuyenAmt : 0),
+            heat: String(Number.isFinite(heatAmt) ? heatAmt : 0),
+            reputation: String(Number.isFinite(repAmt) ? repAmt : 0),
         },
         groups: [
             {
                 heading: "Apply to",
+                note: "Press Apply amounts if you change the numbers, then award.",
                 choices: [
-                    choice(`Award ${actor.name}`, `+${karmaAmt} Karma, +${nuyenAmt.toLocaleString()}¥`, {
-                        action: "award-one", awardKarma: String(karmaAmt), awardNuyen: String(nuyenAmt), cite: core(243),
+                    choice(`Award ${actor.name}`, summaryAward(karmaAmt, nuyenAmt, heatAmt, repAmt), {
+                        action: "award-one",
+                        awardKarma: String(karmaAmt),
+                        awardNuyen: String(nuyenAmt),
+                        awardHeat: String(heatAmt),
+                        awardReputation: String(repAmt),
+                        cite: core(243),
                     }),
-                    choice("Award all player-owned characters", `${party.length} actors`, {
-                        action: "award-party", awardKarma: String(karmaAmt), awardNuyen: String(nuyenAmt),
-                        dim: !party.length, cite: core(243),
+                    choice("Award all player-owned characters", `${party.length} actors · ${summaryAward(karmaAmt, nuyenAmt, heatAmt, repAmt)}`, {
+                        action: "award-party",
+                        awardKarma: String(karmaAmt),
+                        awardNuyen: String(nuyenAmt),
+                        awardHeat: String(heatAmt),
+                        awardReputation: String(repAmt),
+                        dim: !party.length,
+                        cite: core(243),
                     }),
                 ],
             },
@@ -696,6 +842,13 @@ function awardsPage(actor, data) {
             ], core(243)),
         ],
     };
+}
+
+function summaryAward(karma, nuyen, heat, reputation) {
+    const bits = [`+${karma} Karma`, `+${Number(nuyen || 0).toLocaleString()}¥`];
+    if (heat) bits.push(`Heat ${heat > 0 ? "+" : ""}${heat}`);
+    if (reputation) bits.push(`Rep ${reputation > 0 ? "+" : ""}${reputation}`);
+    return bits.join(", ");
 }
 
 function hygienePage(actor) {

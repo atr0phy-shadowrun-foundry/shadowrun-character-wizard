@@ -45,6 +45,8 @@ const INDEX_FIELDS = [
     "system.skill",
     "system.price",
     "system.avail",
+    "system.availDef",
+    "system.availability",
     "system.essence",
     "system.category",
     "system.drain",
@@ -93,19 +95,22 @@ export async function searchPack(packKey, filter = {}) {
     for (const entry of index) {
         if (!entry.name?.toLowerCase().includes(query)) continue;
         const system = systemFromIndex(entry);
+        const availRaw = system.avail ?? system.availDef ?? system.availability ?? "";
         entries.push({
             id: entry._id,
             name: entry.name,
             type: entry.type,
+            subtype: system.subtype || "",
+            systemType: system.type || "",
             hint: indexHint(system, entry.type),
             price: Number(system.price) || 0,
-            avail: system.avail ?? "",
+            avail: availRaw,
             essence: Number(system.essence) || 0,
             karma: Number(system.value) || 0,
         });
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
-    return { missing: false, entries: entries.slice(0, filter.limit ?? 15), short: false };
+    return { missing: false, entries: entries.slice(0, filter.limit ?? 40), short: false };
 }
 
 export async function importFromCompendium(actor, packKey, documentId) {
@@ -114,8 +119,8 @@ export async function importFromCompendium(actor, packKey, documentId) {
         ui.notifications.warn("Enable shadowrun-data before adding a catalog item.");
         return null;
     }
-    if (!actor?.isOwner) {
-        ui.notifications.warn("Only an owner of this actor can add a catalog item to the sheet.");
+    if (!actor?.isOwner && !game.user.isGM) {
+        ui.notifications.warn("Only an owner or GM can add a catalog item to the sheet.");
         return null;
     }
     const document = await collection.getDocument(documentId);
@@ -145,10 +150,12 @@ function systemFromIndex(entry) {
 function indexHint(system, type) {
     const bits = [];
     if (system.price != null && system.price !== "") bits.push(`${Number(system.price).toLocaleString()}¥`);
-    if (system.avail != null && system.avail !== "") bits.push(`Avail ${system.avail}`);
+    const avail = system.avail ?? system.availDef ?? system.availability;
+    if (avail != null && avail !== "") bits.push(`Avail ${avail}`);
     if (system.essence) bits.push(`Essence ${system.essence}`);
     if (type === "quality" && system.value != null) bits.push(`Karma ${system.value}`);
     if (system.skill) bits.push(String(system.skill).replaceAll("_", " "));
-    if (system.type) bits.push(String(system.type).replaceAll("_", " "));
+    if (system.subtype) bits.push(String(system.subtype).replaceAll("_", " "));
+    else if (system.type) bits.push(String(system.type).replaceAll("_", " "));
     return bits.join(" · ") || type || "Item";
 }

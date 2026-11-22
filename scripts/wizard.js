@@ -21,12 +21,14 @@ import {
     uninstallSoftware,
     updateContact,
 } from "./apply.js";
+import { reportChange } from "./chat.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 const DATA_FIELDS = [
     "kind", "itemId", "skill", "spec", "attr", "pack", "documentId", "price",
-    "track", "delta", "deviceId", "awardKarma", "awardNuyen", "go",
+    "track", "delta", "deviceId", "awardKarma", "awardNuyen", "awardHeat",
+    "awardReputation", "go",
 ];
 
 function dataAttribute(key) {
@@ -79,6 +81,8 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
             "raise-submersion": this.#onRaiseSubmersion,
             "buy-karma": this.#onBuyKarma,
             "buy-nuyen": this.#onBuyNuyen,
+            "buy-mod": this.#onBuyMod,
+            "buy-ammo": this.#onBuyAmmo,
             "remove-quality": this.#onRemoveQuality,
             "add-contact": this.#onAddContact,
             "contact-bump": this.#onContactBump,
@@ -154,15 +158,7 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static async #onSubmit(event, form) {
         const query = form?.querySelector?.("[name=compendiumQuery]")?.value;
-        const awardKarma = form?.querySelector?.("[name=awardKarma]")?.value;
-        const awardNuyen = form?.querySelector?.("[name=awardNuyen]")?.value;
-        const specName = form?.querySelector?.("[name=specName]")?.value;
-        const patch = { ...this.char.data };
-        if (query != null) patch.query = query;
-        if (awardKarma != null) patch.awardKarma = awardKarma;
-        if (awardNuyen != null) patch.awardNuyen = awardNuyen;
-        if (specName != null) patch.specName = specName;
-        this.char.data = patch;
+        this.char.data = readFormData(this.char.data, form);
         return this.render();
     }
 
@@ -220,14 +216,7 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static async #onSearch(event) {
         event.preventDefault();
-        const form = this.element;
-        this.char.data = {
-            ...this.char.data,
-            query: form?.querySelector?.("[name=compendiumQuery]")?.value ?? "",
-            awardKarma: form?.querySelector?.("[name=awardKarma]")?.value ?? this.char.data.awardKarma,
-            awardNuyen: form?.querySelector?.("[name=awardNuyen]")?.value ?? this.char.data.awardNuyen,
-            specName: form?.querySelector?.("[name=specName]")?.value ?? this.char.data.specName,
-        };
+        this.char.data = readFormData(this.char.data, this.element);
         return this.render();
     }
 
@@ -294,13 +283,54 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
             price,
             target.dataset.label || cleanLabel(target),
         );
-        if (!created) return;
+        if (!created || created.pending) return this.render();
         if (target.dataset.pack === "weapons") {
-            ui.notifications.info("Weapon added. Check Spend nuyen → Weapon mods or Ammunition for attach options.");
+            await this.#navigate("weapon-detail", { itemId: created.id }, created.name);
+            return;
         }
         if (target.dataset.pack === "software") {
             ui.notifications.info("Software added. Slot it from Deck / RCC programs.");
         }
+        return this.render();
+    }
+
+    static async #onBuyMod(event, target) {
+        event.preventDefault();
+        const weapon = this.actor?.items?.get(target.dataset.itemId);
+        if (!weapon) return;
+        const created = await buyCatalogWithNuyen(
+            this.actor,
+            target.dataset.pack || "weaponMods",
+            target.dataset.documentId,
+            Number(target.dataset.price) || 0,
+            target.dataset.label || cleanLabel(target),
+            {
+                mode: "buy-mod",
+                attachToUuid: weapon.uuid,
+                attachToName: weapon.name,
+            },
+        );
+        if (!created || created.pending) return this.render();
+        return this.render();
+    }
+
+    static async #onBuyAmmo(event, target) {
+        event.preventDefault();
+        const weapon = this.actor?.items?.get(target.dataset.itemId);
+        if (!weapon) return;
+        const created = await buyCatalogWithNuyen(
+            this.actor,
+            target.dataset.pack || "ammunition",
+            target.dataset.documentId,
+            Number(target.dataset.price) || 0,
+            target.dataset.label || cleanLabel(target),
+            {
+                mode: "buy-ammo",
+                attachToUuid: weapon.uuid,
+                attachToName: weapon.name,
+            },
+        );
+        if (!created || created.pending) return this.render();
         return this.render();
     }
 
@@ -395,30 +425,28 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         event.preventDefault();
         const actor = this.actor;
         if (!actor) return;
-        const karma = Number(target.dataset.awardKarma ?? this.char.data.awardKarma) || 0;
-        const nuyen = Number(target.dataset.awardNuyen ?? this.char.data.awardNuyen) || 0;
-        await awardKarma(actor, karma);
-        await awardNuyen(actor, nuyen);
-        ChatMessage.create({
-            content: `<p><strong>Session award</strong> — ${actor.name}: +${karma} Karma, +${nuyen.toLocaleString()}¥.</p>`,
-            speaker: { alias: "Character Wizard" },
-        });
+        const amounts = readAwardAmounts(target, this.char.data);
+        await applySessionAward(actor, amounts);
         ui.notifications.info(`Awarded ${actor.name}.`);
         return this.render();
     }
 
     static async #onAwardParty(event, target) {
         event.preventDefault();
-        const karma = Number(target.dataset.awardKarma ?? this.char.data.awardKarma) || 0;
-        const nuyen = Number(target.dataset.awardNuyen ?? this.char.data.awardNuyen) || 0;
+        const amounts = readAwardAmounts(target, this.char.data);
         const party = game.actors.filter((entry) => entry.hasPlayerOwner && entry.type === "Player");
         for (const actor of party) {
-            await awardKarma(actor, karma);
-            await awardNuyen(actor, nuyen);
+            await applySessionAward(actor, amounts, { silent: true });
         }
-        ChatMessage.create({
-            content: `<p><strong>Session award</strong> — ${party.length} characters: +${karma} Karma, +${nuyen.toLocaleString()}¥ each.</p>`,
-            speaker: { alias: "Character Wizard" },
+        await reportChange({
+            title: "Session awards — party",
+            lines: [
+                `${party.length} player-owned characters`,
+                `+${amounts.karma} Karma each`,
+                `+${amounts.nuyen.toLocaleString()}¥ each`,
+                amounts.heat ? `Heat ${signed(amounts.heat)} each` : "",
+                amounts.reputation ? `Reputation ${signed(amounts.reputation)} each` : "",
+            ].filter(Boolean),
         });
         ui.notifications.info(`Awarded ${party.length} characters.`);
         return this.render();
@@ -468,4 +496,57 @@ function readPatch(target) {
 
 function cleanLabel(target) {
     return target.querySelector?.(".sr6cw-choice-label")?.textContent?.trim() || target.textContent.trim();
+}
+
+function readFormData(data, form) {
+    const patch = { ...data };
+    if (!form) return patch;
+    const query = form.querySelector?.("[name=compendiumQuery]")?.value;
+    const specName = form.querySelector?.("[name=specName]")?.value;
+    const awardKarma = form.querySelector?.("[name=awardKarma]")?.value;
+    const awardNuyen = form.querySelector?.("[name=awardNuyen]")?.value;
+    const awardHeat = form.querySelector?.("[name=awardHeat]")?.value;
+    const awardReputation = form.querySelector?.("[name=awardReputation]")?.value;
+    if (query != null) patch.query = query;
+    if (specName != null) patch.specName = specName;
+    if (awardKarma != null) patch.awardKarma = awardKarma;
+    if (awardNuyen != null) patch.awardNuyen = awardNuyen;
+    if (awardHeat != null) patch.awardHeat = awardHeat;
+    if (awardReputation != null) patch.awardReputation = awardReputation;
+    return patch;
+}
+
+function readAwardAmounts(target, data) {
+    return {
+        karma: Number(target.dataset.awardKarma ?? data.awardKarma) || 0,
+        nuyen: Number(target.dataset.awardNuyen ?? data.awardNuyen) || 0,
+        heat: Number(target.dataset.awardHeat ?? data.awardHeat) || 0,
+        reputation: Number(target.dataset.awardReputation ?? data.awardReputation) || 0,
+    };
+}
+
+async function applySessionAward(actor, amounts, { silent = false } = {}) {
+    await awardKarma(actor, amounts.karma);
+    await awardNuyen(actor, amounts.nuyen);
+    const patch = {};
+    if (amounts.heat) patch["system.heat"] = (Number(actor.system.heat) || 0) + amounts.heat;
+    if (amounts.reputation) {
+        patch["system.reputation"] = (Number(actor.system.reputation) || 0) + amounts.reputation;
+    }
+    if (Object.keys(patch).length) await actor.update(patch);
+    if (silent) return;
+    await reportChange({
+        actor,
+        title: "Session award",
+        lines: [
+            amounts.karma ? `+${amounts.karma} Karma` : "",
+            amounts.nuyen ? `+${amounts.nuyen.toLocaleString()}¥` : "",
+            amounts.heat ? `Heat ${signed(amounts.heat)}` : "",
+            amounts.reputation ? `Reputation ${signed(amounts.reputation)}` : "",
+        ].filter(Boolean),
+    });
+}
+
+function signed(value) {
+    return value > 0 ? `+${value}` : String(value);
 }
