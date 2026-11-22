@@ -140,7 +140,10 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     selectionChanged() {
         const before = this.actor?.uuid ?? null;
-        this.char.actorUuid = null;
+        // Follow a live token selection, but keep a pinned actorUuid when the
+        // canvas has nothing controlled (import-from-sidebar / catalog flows).
+        const controlled = canvas?.tokens?.controlled ?? [];
+        if (controlled.length) this.char.actorUuid = null;
         if (this.actor?.uuid !== before && this.char.pageId !== "home") {
             this.char.pageId = "home";
             this.char.history = [];
@@ -303,108 +306,159 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static async #onBrowseBuy(event, target) {
         event.preventDefault();
-        const hit = await pickFromCatalog({
-            actor: this.actor,
-            packs: target.dataset.pack ? [target.dataset.pack] : undefined,
-            preset: target.dataset.preset || undefined,
-            title: target.dataset.label || cleanLabel(target) || "Buy from catalog",
-        });
-        if (!hit) return;
-        const created = await buyCatalogWithNuyen(
-            this.actor,
-            hit.pack,
-            hit.documentId,
-            hit.price,
-            hit.name,
-        );
-        if (!created || created.pending) return this.render();
-        if (hit.pack === "weapons") {
-            await this.#navigate("weapon-detail", { itemId: created.id }, created.name);
+        const actor = this.actor;
+        if (!actor) {
+            ui.notifications.warn("Select a character before browsing the catalog.");
             return;
         }
-        if (hit.pack === "software") {
-            ui.notifications.info("Software added. Slot it from Deck / RCC programs.");
+        try {
+            const hit = await pickFromCatalog({
+                actor,
+                packs: target.dataset.pack ? [target.dataset.pack] : undefined,
+                preset: target.dataset.preset || undefined,
+                title: target.dataset.label || cleanLabel(target) || "Buy from catalog",
+            });
+            if (!hit) return;
+            const created = await buyCatalogWithNuyen(
+                actor,
+                hit.pack,
+                hit.documentId,
+                hit.price,
+                hit.name,
+            );
+            if (!created) return this.render();
+            if (created.pending) {
+                this.char.data = {
+                    ...this.char.data,
+                    notice: `${hit.name} needs GM approval (Availability). Check chat — nuyen is not spent yet.`,
+                };
+                return this.render();
+            }
+            if (hit.pack === "weapons") {
+                await this.#navigate("weapon-detail", { itemId: created.id }, created.name);
+                return;
+            }
+            if (hit.pack === "software") {
+                ui.notifications.info("Software added. Slot it from Deck / RCC programs.");
+            }
+            return this.render();
+        } catch (error) {
+            console.error("sr6-char-wizard | browse-buy failed", error);
+            ui.notifications.error(error.message || "Catalog purchase failed.");
         }
-        return this.render();
     }
 
     static async #onBrowseKarma(event, target) {
         event.preventDefault();
-        const kind = target.dataset.kind || "quality";
-        const hit = await pickFromCatalog({
-            actor: this.actor,
-            packs: target.dataset.pack ? [target.dataset.pack] : ["qualities"],
-            title: target.dataset.label || cleanLabel(target) || "Karma catalog",
-        });
-        if (!hit) return;
-        let price = hit.price;
-        const listedKarma = Number(hit.karma ?? hit.index?.karma) || 0;
-        if (kind === "spell" || kind === "form") price = 5;
-        else if (kind === "adept") price = 0;
-        else if (listedKarma > 0) price = listedKarma * 2;
-        else price = 5;
-        const created = await buyCatalogWithKarma(
-            this.actor,
-            hit.pack,
-            hit.documentId,
-            price,
-            hit.name,
-        );
-        if (created) return this.render();
+        const actor = this.actor;
+        if (!actor) {
+            ui.notifications.warn("Select a character before browsing the catalog.");
+            return;
+        }
+        try {
+            const kind = target.dataset.kind || "quality";
+            const hit = await pickFromCatalog({
+                actor,
+                packs: target.dataset.pack ? [target.dataset.pack] : ["qualities"],
+                title: target.dataset.label || cleanLabel(target) || "Karma catalog",
+            });
+            if (!hit) return;
+            let price = hit.price;
+            const listedKarma = Number(hit.karma ?? hit.index?.karma) || 0;
+            if (kind === "spell" || kind === "form") price = 5;
+            else if (kind === "adept") price = 0;
+            else if (listedKarma > 0) price = listedKarma * 2;
+            else price = 5;
+            const created = await buyCatalogWithKarma(
+                actor,
+                hit.pack,
+                hit.documentId,
+                price,
+                hit.name,
+            );
+            if (created) return this.render();
+        } catch (error) {
+            console.error("sr6-char-wizard | browse-karma failed", error);
+            ui.notifications.error(error.message || "Catalog Karma purchase failed.");
+        }
     }
 
     static async #onBrowseMod(event, target) {
         event.preventDefault();
-        const weapon = this.actor?.items?.get(target.dataset.itemId);
-        if (!weapon) return;
-        const hit = await pickFromCatalog({
-            actor: this.actor,
-            packs: ["weaponMods"],
-            preset: target.dataset.preset || "weapon-mods",
-            title: `Mod for ${weapon.name}`,
-        });
-        if (!hit) return;
-        const created = await buyCatalogWithNuyen(
-            this.actor,
-            hit.pack,
-            hit.documentId,
-            hit.price,
-            hit.name,
-            {
-                mode: "buy-mod",
-                attachToUuid: weapon.uuid,
-                attachToName: weapon.name,
-            },
-        );
-        if (!created || created.pending) return this.render();
-        return this.render();
+        const actor = this.actor;
+        const weapon = actor?.items?.get(target.dataset.itemId);
+        if (!actor || !weapon) return;
+        try {
+            const hit = await pickFromCatalog({
+                actor,
+                packs: ["weaponMods"],
+                preset: target.dataset.preset || "weapon-mods",
+                title: `Mod for ${weapon.name}`,
+            });
+            if (!hit) return;
+            const created = await buyCatalogWithNuyen(
+                actor,
+                hit.pack,
+                hit.documentId,
+                hit.price,
+                hit.name,
+                {
+                    mode: "buy-mod",
+                    attachToUuid: weapon.uuid,
+                    attachToName: weapon.name,
+                },
+            );
+            if (!created) return this.render();
+            if (created.pending) {
+                this.char.data = {
+                    ...this.char.data,
+                    notice: `${hit.name} needs GM approval (Availability). Check chat — nuyen is not spent yet.`,
+                };
+            }
+            return this.render();
+        } catch (error) {
+            console.error("sr6-char-wizard | browse-mod failed", error);
+            ui.notifications.error(error.message || "Catalog mod purchase failed.");
+        }
     }
 
     static async #onBrowseAmmo(event, target) {
         event.preventDefault();
-        const weapon = this.actor?.items?.get(target.dataset.itemId);
-        if (!weapon) return;
-        const hit = await pickFromCatalog({
-            actor: this.actor,
-            packs: ["ammunition"],
-            preset: target.dataset.preset || "ammo-for-owned",
-            title: `Ammo for ${weapon.name}`,
-        });
-        if (!hit) return;
-        const created = await buyCatalogWithNuyen(
-            this.actor,
-            hit.pack,
-            hit.documentId,
-            hit.price,
-            hit.name,
-            {
-                mode: "buy-ammo",
-                attachToUuid: weapon.uuid,
-                attachToName: weapon.name,
-            },
-        );
-        if (!created || created.pending) return this.render();
-        return this.render();
+        const actor = this.actor;
+        const weapon = actor?.items?.get(target.dataset.itemId);
+        if (!actor || !weapon) return;
+        try {
+            const hit = await pickFromCatalog({
+                actor,
+                packs: ["ammunition"],
+                preset: target.dataset.preset || "ammo-for-owned",
+                title: `Ammo for ${weapon.name}`,
+            });
+            if (!hit) return;
+            const created = await buyCatalogWithNuyen(
+                actor,
+                hit.pack,
+                hit.documentId,
+                hit.price,
+                hit.name,
+                {
+                    mode: "buy-ammo",
+                    attachToUuid: weapon.uuid,
+                    attachToName: weapon.name,
+                },
+            );
+            if (!created) return this.render();
+            if (created.pending) {
+                this.char.data = {
+                    ...this.char.data,
+                    notice: `${hit.name} needs GM approval (Availability). Check chat — nuyen is not spent yet.`,
+                };
+            }
+            return this.render();
+        } catch (error) {
+            console.error("sr6-char-wizard | browse-ammo failed", error);
+            ui.notifications.error(error.message || "Catalog ammo purchase failed.");
+        }
     }
 
     static async #onBuyMod(event, target) {

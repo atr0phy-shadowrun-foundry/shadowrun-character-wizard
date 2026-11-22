@@ -327,7 +327,15 @@ async function finalizeNuyenPurchase(actor, payload, meta = {}) {
     }
     const cost = Number(payload.price) || 0;
     if (cost > 0 && !(await spendNuyen(actor, cost, payload.label))) return null;
-    const created = await importFromCompendium(actor, payload.pack, payload.documentId);
+    let created = null;
+    try {
+        created = await importFromCompendium(actor, payload.pack, payload.documentId);
+    } catch (error) {
+        console.error("sr6-char-wizard | import failed after nuyen spend", error);
+        if (cost > 0) await actor.update({ "system.nuyen": readNuyen(actor) + cost });
+        ui.notifications.error(error.message || "Could not add that item to the sheet.");
+        return null;
+    }
     if (!created) {
         if (cost > 0) await actor.update({ "system.nuyen": readNuyen(actor) + cost });
         return null;

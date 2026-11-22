@@ -128,7 +128,8 @@ export async function importFromCompendium(actor, packKey, documentId) {
         ui.notifications.warn("That catalog entry could not be loaded.");
         return null;
     }
-    const data = document.constructor.fromCompendium(document.toObject(), {
+    // Foundry v13+: fromCompendium lives on the world collection, not Document.
+    const data = game.items.fromCompendium(document, {
         clearFolder: true,
         clearSort: true,
         clearOwnership: true,

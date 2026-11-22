@@ -43,8 +43,12 @@ export async function buildPage(state) {
         name: candidate.name,
         current: candidate.uuid === actor?.uuid,
     }));
+    // Transient notice from browse/purchase handlers wins over a page's default tip.
+    const notice = state.data?.notice || page.notice || null;
+    if (state.data?.notice) delete state.data.notice;
     return {
         ...page,
+        notice,
         actor,
         acting: actingCard(acting),
         actors,
