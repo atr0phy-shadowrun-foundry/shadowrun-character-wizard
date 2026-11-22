@@ -39,7 +39,7 @@
       }
     ]
   },
-  "url": "",
-  "manifest": "",
-  "download": ""
+  "url": "https://github.com/atr0phy-shadowrun-foundry/shadowrun-character-wizard",
+  "manifest": "https://raw.githubusercontent.com/atr0phy-shadowrun-foundry/shadowrun-character-wizard/main/module.json",
+  "download": "https://github.com/atr0phy-shadowrun-foundry/shadowrun-character-wizard/archive/refs/heads/main.zip"
 }

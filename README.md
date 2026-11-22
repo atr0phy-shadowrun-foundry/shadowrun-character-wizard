@@ -15,4 +15,8 @@ Scaffold only. Rules inventory and v1 door list: [`docs/SCOPE.md`](docs/SCOPE.md
 
 ## Install
 
-Copy or symlink this folder into Foundry user data `Data/modules/sr6-char-wizard`, enable it in the world beside Eden and `shadowrun-data`.
+In Foundry: Install Module → Manifest URL:
+
+`https://raw.githubusercontent.com/atr0phy-shadowrun-foundry/shadowrun-character-wizard/main/module.json`
+
+Or copy/symlink this folder into `Data/modules/sr6-char-wizard`. Enable beside Eden and `shadowrun-data`.
