@@ -17,7 +17,7 @@ export function skillRank(actor, skillId) {
 export function attributeRank(actor, attrId) {
     const attr = actor?.system?.attributes?.[attrId];
     if (!attr) return null;
-    if (attrId === "edg") return Number(attr.max ?? attr.base ?? 0);
+    if (attrId === "edg") return Number(attr.max) || 0;
     if (attr.pool != null && attr.pool !== "") return Number(attr.pool);
     return Number(attr.base || 0) + Number(attr.mod || 0);
 }
@@ -151,17 +151,15 @@ export async function raiseAttribute(actor, attrId) {
         return false;
     }
     if (attrId === "edg") {
-        const current = Number(attr.max ?? attr.base ?? 0);
+        // Eden Edge is { current, max } — no base like other attributes.
+        const current = Number(attr.max) || 0;
         if (current >= 7) {
             ui.notifications.warn("Edge attribute tops out at 7.");
             return false;
         }
         const cost = costToRaise(current);
         if (!(await spendKarma(actor, cost, `Edge ${current}→${current + 1}`))) return false;
-        await actor.update({
-            "system.attributes.edg.max": current + 1,
-            "system.attributes.edg.base": current + 1,
-        });
+        await actor.update({ "system.attributes.edg.max": current + 1 });
         return true;
     }
     const current = Number(attr.base) || 0;

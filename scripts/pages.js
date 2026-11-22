@@ -202,7 +202,7 @@ function karmaAttrs(actor) {
         const current = attributeRank(actor, id);
         if (current == null) return null;
         const base = id === "edg"
-            ? Number(actor.system.attributes.edg.max ?? actor.system.attributes.edg.base ?? 0)
+            ? Number(actor.system.attributes.edg.max) || 0
             : Number(actor.system.attributes[id]?.base) || 0;
         const cost = costToRaise(base);
         const cap = id === "edg" ? 7 : 9;
