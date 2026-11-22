@@ -1,6 +1,6 @@
 # Shadowrun Character Wizard
 
-Foundry module `sr6-char-wizard` version 0.1.2.
+Foundry module `sr6-char-wizard` version 0.1.3.
 
 Post-generation maintenance for runners who already exist on the Eden sheet: spend Karma and nuyen after a run, update contacts and SINs, install or remove cyberware, reshuffle deck/RCC programs, let the GM award session rewards, and scan the sheet for hygiene issues. It is not a character-creation or priority wizard.
 

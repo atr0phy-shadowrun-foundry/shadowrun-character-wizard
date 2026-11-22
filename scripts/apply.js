@@ -596,13 +596,11 @@ export function isAugmentation(item) {
     );
 }
 
+/** Program hosts only: cyberdeck, RCC (RIGGER_CONSOLE), or a commlink with progSlots. */
 export function isMatrixDevice(item) {
     if (item?.type !== "gear") return false;
-    return Number(item.system?.progSlots) > 0
-        || Boolean(item.system?.isElectronicMatrixDevice)
-        || String(item.system?.type || "").includes("CYBERDECK")
-        || String(item.system?.type || "").includes("RCC")
-        || String(item.system?.subtype || "").includes("CYBERDECK")
-        || String(item.system?.subtype || "").includes("RCC")
-        || String(item.system?.subtype || "").includes("COMMLINK");
+    const subtype = String(item.system?.subtype || "");
+    if (subtype === "CYBERDECK" || subtype === "RIGGER_CONSOLE") return true;
+    if (subtype === "COMMLINK") return Number(item.system?.progSlots) > 0;
+    return false;
 }

@@ -768,16 +768,16 @@ function programsPage(actor, data) {
     return {
         kicker: "Programs",
         title: "Which device?",
-        lead: "Pick a cyberdeck, RCC, or other gear with program slots. Buy software under Spend nuyen first if needed.",
+        lead: "Pick a cyberdeck, rigger console, or slotted commlink. Buy software under Spend nuyen first if needed.",
         leadCite: core(184),
         groups: [{
             choices: devices.length ? devices.map((item) => {
                 const slots = Number(item.system.progSlots) || 0;
                 const running = software.filter((entry) => entry.system.embeddedInUuid && String(entry.system.embeddedInUuid).includes(item.id)).length;
-                return choice(item.name, slots ? `${running}/${slots} programs` : item.system.type || "Device", {
+                return choice(item.name, slots ? `${running}/${slots} programs` : item.system.subtype || "Device", {
                     go: "programs", itemId: item.id, cite: core(184),
                 });
-            }) : [choice("No matrix devices with slots", "Add a deck or RCC to the sheet.", { disabled: true })],
+            }) : [choice("No deck, RCC, or slotted commlink", "Add one to the sheet, then return here.", { disabled: true })],
         }, {
             heading: "Loose software",
             choices: software.filter((item) => !item.system.embeddedInUuid).map((item) => choice(
