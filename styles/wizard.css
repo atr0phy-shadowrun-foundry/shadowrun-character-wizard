@@ -644,6 +644,54 @@
     min-height: 2rem;
 }
 
+.sr6-char-wizard .sr6cw-award-roster {
+    margin: 0 0 0.9rem;
+}
+
+.sr6-char-wizard .sr6cw-award-roster h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.95rem;
+}
+
+.sr6-char-wizard .sr6cw-award-runners {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+}
+
+.sr6-char-wizard .sr6cw-award-runner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0.3rem 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+}
+
+.sr6-char-wizard .sr6cw-award-runner input {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+}
+
+.sr6-char-wizard .sr6cw-award-runner img {
+    width: 1.75rem;
+    height: 1.75rem;
+    object-fit: cover;
+    border: 0;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.sr6-char-wizard .sr6cw-award-runner span {
+    font-weight: 600;
+}
+
 /* Token toolbar — amber so it reads apart from the cyan turn wizard */
 #scene-controls-tools button.tool[data-tool="sr6CharWizard"] {
     color: #e0b15a;

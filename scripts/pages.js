@@ -118,9 +118,11 @@ function homePage(actor) {
             {
                 heading: "Table tools",
                 choices: [
-                    choice("Session awards", "GM: Karma and nuyen after a session.", {
-                        go: "awards", cite: core(243), dim: !game.user.isGM,
-                    }),
+                    ...(game.user.isGM ? [
+                        choice("Session awards", "Karma, nuyen, Heat, and Reputation for runners on this scene.", {
+                            go: "awards", cite: core(243),
+                        }),
+                    ] : []),
                     choice("Sheet hygiene", "Scan for missing skills, Essence, program overfill, empty contacts.", {
                         go: "hygiene",
                     }),
@@ -795,15 +797,17 @@ function awardsPage(actor, data) {
             groups: [],
         };
     }
-    const party = game.actors.filter((entry) => entry.hasPlayerOwner && entry.type === "Player");
+    const scenePlayers = scenePlayerCharacters();
+    const selected = resolveAwardSelection(data.awardSelected, scenePlayers);
     const karmaAmt = Number(data.awardKarma ?? 5);
     const nuyenAmt = Number(data.awardNuyen ?? 0);
     const heatAmt = Number(data.awardHeat ?? 0);
     const repAmt = Number(data.awardReputation ?? 0);
+    const selectedCount = selected.length;
     return {
         kicker: "GM",
         title: "Session awards",
-        lead: "Core guidance: about 5 Karma is one meaningful improvement. Cash is usually offered per runner. Heat and Reputation fields are ready for later session tracking.",
+        lead: "Amounts apply to every checked Player character that has a token on this scene. Uncheck anyone who sat this one out.",
         leadCite: core(243),
         awardsForm: {
             karma: String(Number.isFinite(karmaAmt) ? karmaAmt : 5),
@@ -811,28 +815,32 @@ function awardsPage(actor, data) {
             heat: String(Number.isFinite(heatAmt) ? heatAmt : 0),
             reputation: String(Number.isFinite(repAmt) ? repAmt : 0),
         },
+        awardRoster: scenePlayers.map((entry) => ({
+            uuid: entry.uuid,
+            name: entry.name,
+            img: entry.img || "icons/svg/mystery-man.svg",
+            selected: selected.includes(entry.uuid),
+        })),
         groups: [
             {
-                heading: "Apply to",
-                note: "Press Apply amounts if you change the numbers, then award.",
+                heading: "Award",
+                note: scenePlayers.length
+                    ? "Press Apply amounts if you change the numbers, then award the checked runners."
+                    : "Place Player character tokens on this scene to award them here.",
                 choices: [
-                    choice(`Award ${actor.name}`, summaryAward(karmaAmt, nuyenAmt, heatAmt, repAmt), {
-                        action: "award-one",
-                        awardKarma: String(karmaAmt),
-                        awardNuyen: String(nuyenAmt),
-                        awardHeat: String(heatAmt),
-                        awardReputation: String(repAmt),
-                        cite: core(243),
-                    }),
-                    choice("Award all player-owned characters", `${party.length} actors · ${summaryAward(karmaAmt, nuyenAmt, heatAmt, repAmt)}`, {
-                        action: "award-party",
-                        awardKarma: String(karmaAmt),
-                        awardNuyen: String(nuyenAmt),
-                        awardHeat: String(heatAmt),
-                        awardReputation: String(repAmt),
-                        dim: !party.length,
-                        cite: core(243),
-                    }),
+                    choice(
+                        `Award selected (${selectedCount})`,
+                        summaryAward(karmaAmt, nuyenAmt, heatAmt, repAmt),
+                        {
+                            action: "award-selected",
+                            awardKarma: String(karmaAmt),
+                            awardNuyen: String(nuyenAmt),
+                            awardHeat: String(heatAmt),
+                            awardReputation: String(repAmt),
+                            dim: !selectedCount,
+                            cite: core(243),
+                        },
+                    ),
                 ],
             },
         ],
@@ -842,6 +850,31 @@ function awardsPage(actor, data) {
             ], core(243)),
         ],
     };
+}
+
+/** Player actors that currently have at least one token on the active scene. */
+export function scenePlayerCharacters() {
+    const scene = canvas?.scene;
+    if (!scene) return [];
+    const tokens = scene.tokens?.contents ?? [];
+    const seen = new Set();
+    const list = [];
+    for (const token of tokens) {
+        const actor = token.actor;
+        if (!actor || actor.type !== "Player") continue;
+        if (seen.has(actor.uuid)) continue;
+        seen.add(actor.uuid);
+        list.push(actor);
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function resolveAwardSelection(stored, scenePlayers) {
+    const uuids = scenePlayers.map((entry) => entry.uuid);
+    // First open: everyone on the scene is checked. After that, honor the checkbox set
+    // (including an empty set if the GM unchecked everyone).
+    if (!Array.isArray(stored)) return uuids;
+    return uuids.filter((uuid) => stored.includes(uuid));
 }
 
 function summaryAward(karma, nuyen, heat, reputation) {

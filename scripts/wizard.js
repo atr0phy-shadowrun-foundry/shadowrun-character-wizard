@@ -93,8 +93,7 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
             "uninstall-soft": this.#onUninstallSoft,
             "delete-item": this.#onDeleteItem,
             "open-item": this.#onOpenItem,
-            "award-one": this.#onAwardOne,
-            "award-party": this.#onAwardParty,
+            "award-selected": this.#onAwardSelected,
             noop: () => {},
         };
     }
@@ -168,6 +167,10 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         const patch = readPatch(target);
         const pageId = target.dataset.go;
         if (!pageId) return;
+        if (pageId === "awards" && !game.user.isGM) {
+            ui.notifications.warn("Only a gamemaster can open session awards.");
+            return;
+        }
         await this.#navigate(pageId, patch, target.dataset.label || cleanLabel(target));
     }
 
@@ -421,34 +424,39 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         item?.sheet?.render(true);
     }
 
-    static async #onAwardOne(event, target) {
+    static async #onAwardSelected(event, target) {
         event.preventDefault();
-        const actor = this.actor;
-        if (!actor) return;
+        if (!game.user.isGM) {
+            ui.notifications.warn("Only a gamemaster can award session rewards.");
+            return;
+        }
+        this.char.data = readFormData(this.char.data, this.element);
         const amounts = readAwardAmounts(target, this.char.data);
-        await applySessionAward(actor, amounts);
-        ui.notifications.info(`Awarded ${actor.name}.`);
-        return this.render();
-    }
-
-    static async #onAwardParty(event, target) {
-        event.preventDefault();
-        const amounts = readAwardAmounts(target, this.char.data);
-        const party = game.actors.filter((entry) => entry.hasPlayerOwner && entry.type === "Player");
+        const selected = Array.isArray(this.char.data.awardSelected) ? this.char.data.awardSelected : [];
+        const party = [];
+        for (const uuid of selected) {
+            const doc = fromUuidSync(uuid);
+            const actor = doc?.actor ?? doc;
+            if (actor?.documentName === "Actor" && actor.type === "Player") party.push(actor);
+        }
+        if (!party.length) {
+            ui.notifications.warn("Select at least one Player character on this scene.");
+            return this.render();
+        }
         for (const actor of party) {
             await applySessionAward(actor, amounts, { silent: true });
         }
         await reportChange({
-            title: "Session awards — party",
+            title: "Session awards",
             lines: [
-                `${party.length} player-owned characters`,
+                party.map((entry) => entry.name).join(", "),
                 `+${amounts.karma} Karma each`,
                 `+${amounts.nuyen.toLocaleString()}¥ each`,
                 amounts.heat ? `Heat ${signed(amounts.heat)} each` : "",
                 amounts.reputation ? `Reputation ${signed(amounts.reputation)} each` : "",
             ].filter(Boolean),
         });
-        ui.notifications.info(`Awarded ${party.length} characters.`);
+        ui.notifications.info(`Awarded ${party.length} character${party.length === 1 ? "" : "s"}.`);
         return this.render();
     }
 
@@ -513,6 +521,12 @@ function readFormData(data, form) {
     if (awardNuyen != null) patch.awardNuyen = awardNuyen;
     if (awardHeat != null) patch.awardHeat = awardHeat;
     if (awardReputation != null) patch.awardReputation = awardReputation;
+    const awardBoxes = form.querySelectorAll?.("[name=awardActor]");
+    if (awardBoxes?.length) {
+        patch.awardSelected = [...awardBoxes]
+            .filter((input) => input.checked)
+            .map((input) => input.value);
+    }
     return patch;
 }
 

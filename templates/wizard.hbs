@@ -76,6 +76,23 @@
             </label>
             <button type="button" class="sr6cw-award-apply" data-action="search">Apply amounts</button>
         </div>
+        {{#if awardRoster}}
+        <section class="sr6cw-award-roster">
+            <h3>On this scene</h3>
+            <p class="sr6cw-group-note">Player characters with a token here. Uncheck anyone who should not receive this award.</p>
+            <div class="sr6cw-award-runners">
+                {{#each awardRoster}}
+                <label class="sr6cw-award-runner">
+                    <input type="checkbox" name="awardActor" value="{{uuid}}" {{#if selected}}checked{{/if}}>
+                    <img src="{{img}}" alt="">
+                    <span>{{name}}</span>
+                </label>
+                {{else}}
+                <p class="sr6cw-group-note">No Player character tokens on this scene.</p>
+                {{/each}}
+            </div>
+        </section>
+        {{/if}}
         {{/if}}
 
         {{#if search}}
