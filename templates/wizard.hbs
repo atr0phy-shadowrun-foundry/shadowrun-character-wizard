@@ -1,0 +1,128 @@
+{{#*inline "blocks"}}
+{{#each blocks}}
+<details class="sr6cw-block {{tone}}" {{#if open}}open{{/if}}>
+    <summary class="sr6cw-block-head">
+        <h3>{{heading}}</h3>
+        {{#if cite}}<button type="button" class="sr6cw-cite" data-action="book" data-book="{{cite.book}}" data-page="{{cite.page}}">{{cite.label}} p. {{cite.page}}</button>{{/if}}
+    </summary>
+    {{#each paragraphs}}<p>{{this}}</p>{{/each}}
+</details>
+{{/each}}
+{{/inline}}
+<div class="sr6cw">
+    <header class="sr6cw-bar">
+        <div class="sr6cw-faceoff">
+            <div class="sr6cw-side">
+                <span class="sr6cw-side-label">Character</span>
+                {{#if acting.uuid}}
+                <button type="button" class="sr6cw-face {{#if acting.note}}warn{{/if}}" data-action="sheet" data-uuid="{{acting.uuid}}" data-name="{{acting.name}}" data-tooltip="Open {{acting.name}}'s sheet">
+                    <img src="{{acting.img}}" alt="">
+                    <span class="sr6cw-face-copy"><span>{{acting.name}}</span>{{#if acting.note}}<em>{{acting.note}}</em>{{/if}}</span>
+                </button>
+                {{else if acting}}
+                <span class="sr6cw-face warn">
+                    <img src="{{acting.img}}" alt="">
+                    <span class="sr6cw-face-copy"><span>{{acting.name}}</span><em>{{acting.note}}</em></span>
+                </span>
+                {{else}}
+                <span class="sr6cw-face empty"><span>Nothing selected</span></span>
+                {{/if}}
+            </div>
+            {{#if purse}}
+            <div class="sr6cw-purse" data-tooltip="Lifetime Karma {{purse.karmaTotal}}">
+                <span class="sr6cw-side-label">Purse</span>
+                <div class="sr6cw-purse-row">
+                    <span>Karma {{purse.karma}}</span>
+                    <span>{{purse.nuyen}}¥</span>
+                    {{#if purse.essence}}<span>Essence {{purse.essence}}</span>{{/if}}
+                </div>
+            </div>
+            {{/if}}
+        </div>
+        {{#if multipleActors}}
+        <div class="sr6cw-actors">
+            {{#each actors}}
+            <button type="button" class="sr6cw-chip {{#if current}}current{{/if}}" data-action="actor" data-actor-uuid="{{uuid}}">{{name}}</button>
+            {{/each}}
+        </div>
+        {{/if}}
+    </header>
+
+    <div class="sr6cw-scroll">
+        {{#if kicker}}<p class="sr6cw-kicker">{{kicker}}</p>{{/if}}
+        {{#if title}}<h2 class="sr6cw-title">{{title}}</h2>{{/if}}
+        {{#if lead}}
+        <p class="sr6cw-lead">{{lead}}{{#if leadCite}} <button type="button" class="sr6cw-cite" data-action="book" data-book="{{leadCite.book}}" data-page="{{leadCite.page}}">{{leadCite.label}} p. {{leadCite.page}}</button>{{/if}}</p>
+        {{/if}}
+        {{#if notice}}<p class="sr6cw-notice">{{notice}}</p>{{/if}}
+
+        {{#if search}}
+        <div class="sr6cw-search">
+            {{#if search.field}}
+            <input type="text" name="{{search.field}}" value="{{search.query}}" placeholder="{{search.placeholder}}">
+            {{else}}
+            <input type="search" name="compendiumQuery" value="{{search.query}}" placeholder="{{search.placeholder}}">
+            {{/if}}
+            {{#if search.secondField}}
+            <input type="text" name="{{search.secondField}}" value="{{search.secondQuery}}" placeholder="{{search.secondPlaceholder}}">
+            {{/if}}
+            <button type="button" data-action="search">Apply</button>
+            {{#if search.pack}}<button type="button" data-action="pack" data-pack="{{search.pack}}">Open pack</button>{{/if}}
+        </div>
+        {{/if}}
+
+        {{#each groups}}
+        <section class="sr6cw-group">
+            {{#if heading}}<h3>{{heading}}</h3>{{/if}}
+            {{#if note}}<p class="sr6cw-group-note">{{note}}</p>{{/if}}
+            <div class="sr6cw-choices">
+                {{#each choices}}
+                <div class="sr6cw-choice-row">
+                <button type="button"
+                    class="sr6cw-choice {{#if dim}}dim{{/if}}"
+                    data-action="{{#if action}}{{action}}{{else}}choose{{/if}}"
+                    {{#if go}}data-go="{{go}}"{{/if}}
+                    data-label="{{label}}"
+                    {{#if kind}}data-kind="{{kind}}"{{/if}}
+                    {{#if itemId}}data-item-id="{{itemId}}"{{/if}}
+                    {{#if skill}}data-skill="{{skill}}"{{/if}}
+                    {{#if spec}}data-spec="{{spec}}"{{/if}}
+                    {{#if attr}}data-attr="{{attr}}"{{/if}}
+                    {{#if pack}}data-pack="{{pack}}"{{/if}}
+                    {{#if documentId}}data-document-id="{{documentId}}"{{/if}}
+                    {{#if price}}data-price="{{price}}"{{/if}}
+                    {{#if track}}data-track="{{track}}"{{/if}}
+                    {{#if delta}}data-delta="{{delta}}"{{/if}}
+                    {{#if deviceId}}data-device-id="{{deviceId}}"{{/if}}
+                    {{#if awardKarma}}data-award-karma="{{awardKarma}}"{{/if}}
+                    {{#if awardNuyen}}data-award-nuyen="{{awardNuyen}}"{{/if}}
+                    {{#if disabled}}disabled{{/if}}>
+                    <span class="sr6cw-choice-copy">
+                        <span class="sr6cw-choice-label">{{label}}</span>
+                        {{#if hint}}<span class="sr6cw-choice-hint">{{hint}}</span>{{/if}}
+                    </span>
+                    {{#if badge}}<span class="sr6cw-badge">{{badge}}</span>{{/if}}
+                </button>
+                {{#if cite}}
+                <span class="sr6cw-help">
+                    <button type="button" class="sr6cw-help-btn" data-action="book" data-book="{{cite.book}}" data-page="{{cite.page}}" aria-label="{{cite.label}} p. {{cite.page}}">?</button>
+                </span>
+                {{/if}}
+                </div>
+                {{/each}}
+            </div>
+        </section>
+        {{/each}}
+
+        {{> blocks}}
+    </div>
+
+    <footer class="sr6cw-foot">
+        <nav class="sr6cw-crumb">
+            {{#each crumb}}
+            {{#if current}}<span aria-current="page">{{label}}</span>
+            {{else}}<button type="button" data-action="crumb" data-index="{{index}}">{{label}}</button>{{/if}}
+            {{/each}}
+        </nav>
+    </footer>
+</div>

@@ -1,8 +1,6 @@
 # Plan: `sr6-char-wizard` (character maintenance)
 
-> Canonical copy for the workspace brain: `docs/plans/sr6-char-wizard.md`. Keep both in sync when the inventory changes.
-
-**Status:** Module folder scaffolded at [`sr6-char-wizard/`](../) version **0.0.1**. No ApplicationV2 UI yet. This file is the living rules inventory for v1 doors. Cite printed pages; summarize in original wording; do not transcribe the PDFs.
+**Status:** Module [`sr6-char-wizard/`](../../sr6-char-wizard/) version **0.1.0** — first ApplicationV2 pass for doors A–G. This file remains the living rules inventory. Cite printed pages; summarize in original wording; do not transcribe the PDFs.
 
 **Purpose:** Post-run upgrades and sheet maintenance for characters that already exist in Foundry. Replaces the Commlink export/import loop for Karma spends, gear buys, contacts/SINs, cyberware, programs, session awards, and hygiene. **Not** a character-creation / priority / point-buy / life-path wizard — that stays in [`../rules/character-creation.md`](../../docs/rules/character-creation.md).
 
@@ -173,4 +171,3 @@ Each callout: what is wrong, book or Eden reason, one-click fix when safe (never
 - [`../rules/code-crosswalk.md`](../../docs/rules/code-crosswalk.md) — Eden item types
 - [`../system/DEVELOPER_REFERENCE.md`](../../docs/system/DEVELOPER_REFERENCE.md) — actor/item fields
 - Turn wizard pattern: [`../../sr6-turn-wizard/`](../../sr6-turn-wizard/)
-

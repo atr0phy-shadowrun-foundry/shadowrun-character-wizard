@@ -2,7 +2,7 @@
   "id": "sr6-char-wizard",
   "title": "Shadowrun Character Wizard",
   "description": "Post-run character maintenance for Shadowrun 6 on the Eden sheet: spend Karma and nuyen, manage contacts and SINs, install cyberware, reshuffle deck programs, award session rewards, and review sheet hygiene. Requires shadowrun-data. Not a character-creation wizard.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "compatibility": {
     "minimum": "13",
     "verified": "14.370",
