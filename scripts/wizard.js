@@ -83,6 +83,10 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
             "buy-nuyen": this.#onBuyNuyen,
             "buy-mod": this.#onBuyMod,
             "buy-ammo": this.#onBuyAmmo,
+            "browse-buy": this.#onBrowseBuy,
+            "browse-karma": this.#onBrowseKarma,
+            "browse-mod": this.#onBrowseMod,
+            "browse-ammo": this.#onBrowseAmmo,
             "remove-quality": this.#onRemoveQuality,
             "add-contact": this.#onAddContact,
             "contact-bump": this.#onContactBump,
@@ -297,6 +301,112 @@ export class CharWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         return this.render();
     }
 
+    static async #onBrowseBuy(event, target) {
+        event.preventDefault();
+        const hit = await pickFromCatalog({
+            actor: this.actor,
+            packs: target.dataset.pack ? [target.dataset.pack] : undefined,
+            preset: target.dataset.preset || undefined,
+            title: target.dataset.label || cleanLabel(target) || "Buy from catalog",
+        });
+        if (!hit) return;
+        const created = await buyCatalogWithNuyen(
+            this.actor,
+            hit.pack,
+            hit.documentId,
+            hit.price,
+            hit.name,
+        );
+        if (!created || created.pending) return this.render();
+        if (hit.pack === "weapons") {
+            await this.#navigate("weapon-detail", { itemId: created.id }, created.name);
+            return;
+        }
+        if (hit.pack === "software") {
+            ui.notifications.info("Software added. Slot it from Deck / RCC programs.");
+        }
+        return this.render();
+    }
+
+    static async #onBrowseKarma(event, target) {
+        event.preventDefault();
+        const kind = target.dataset.kind || "quality";
+        const hit = await pickFromCatalog({
+            actor: this.actor,
+            packs: target.dataset.pack ? [target.dataset.pack] : ["qualities"],
+            title: target.dataset.label || cleanLabel(target) || "Karma catalog",
+        });
+        if (!hit) return;
+        let price = hit.price;
+        const listedKarma = Number(hit.karma ?? hit.index?.karma) || 0;
+        if (kind === "spell" || kind === "form") price = 5;
+        else if (kind === "adept") price = 0;
+        else if (listedKarma > 0) price = listedKarma * 2;
+        else price = 5;
+        const created = await buyCatalogWithKarma(
+            this.actor,
+            hit.pack,
+            hit.documentId,
+            price,
+            hit.name,
+        );
+        if (created) return this.render();
+    }
+
+    static async #onBrowseMod(event, target) {
+        event.preventDefault();
+        const weapon = this.actor?.items?.get(target.dataset.itemId);
+        if (!weapon) return;
+        const hit = await pickFromCatalog({
+            actor: this.actor,
+            packs: ["weaponMods"],
+            preset: target.dataset.preset || "weapon-mods",
+            title: `Mod for ${weapon.name}`,
+        });
+        if (!hit) return;
+        const created = await buyCatalogWithNuyen(
+            this.actor,
+            hit.pack,
+            hit.documentId,
+            hit.price,
+            hit.name,
+            {
+                mode: "buy-mod",
+                attachToUuid: weapon.uuid,
+                attachToName: weapon.name,
+            },
+        );
+        if (!created || created.pending) return this.render();
+        return this.render();
+    }
+
+    static async #onBrowseAmmo(event, target) {
+        event.preventDefault();
+        const weapon = this.actor?.items?.get(target.dataset.itemId);
+        if (!weapon) return;
+        const hit = await pickFromCatalog({
+            actor: this.actor,
+            packs: ["ammunition"],
+            preset: target.dataset.preset || "ammo-for-owned",
+            title: `Ammo for ${weapon.name}`,
+        });
+        if (!hit) return;
+        const created = await buyCatalogWithNuyen(
+            this.actor,
+            hit.pack,
+            hit.documentId,
+            hit.price,
+            hit.name,
+            {
+                mode: "buy-ammo",
+                attachToUuid: weapon.uuid,
+                attachToName: weapon.name,
+            },
+        );
+        if (!created || created.pending) return this.render();
+        return this.render();
+    }
+
     static async #onBuyMod(event, target) {
         event.preventDefault();
         const weapon = this.actor?.items?.get(target.dataset.itemId);
@@ -504,6 +614,15 @@ function readPatch(target) {
 
 function cleanLabel(target) {
     return target.querySelector?.(".sr6cw-choice-label")?.textContent?.trim() || target.textContent.trim();
+}
+
+async function pickFromCatalog(options) {
+    const api = game.modules.get("sr6-catalog")?.api;
+    if (!api?.pick) {
+        ui.notifications.warn("Enable the Shadowrun Catalog module (sr6-catalog).");
+        return null;
+    }
+    return api.pick(options);
 }
 
 function readFormData(data, form) {

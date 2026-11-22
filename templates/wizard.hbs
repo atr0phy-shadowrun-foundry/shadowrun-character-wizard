@@ -128,6 +128,7 @@
                     {{#if spec}}data-spec="{{spec}}"{{/if}}
                     {{#if attr}}data-attr="{{attr}}"{{/if}}
                     {{#if pack}}data-pack="{{pack}}"{{/if}}
+                    {{#if preset}}data-preset="{{preset}}"{{/if}}
                     {{#if documentId}}data-document-id="{{documentId}}"{{/if}}
                     {{#if price}}data-price="{{price}}"{{/if}}
                     {{#if track}}data-track="{{track}}"{{/if}}
@@ -145,8 +146,11 @@
                     {{#if badge}}<span class="sr6cw-badge">{{badge}}</span>{{/if}}
                 </button>
                 {{#if cite}}
-                <span class="sr6cw-help">
-                    <button type="button" class="sr6cw-help-btn" data-action="book" data-book="{{cite.book}}" data-page="{{cite.page}}" aria-label="{{cite.label}} p. {{cite.page}}">?</button>
+                <span class="sr6cw-help rules">
+                    <button type="button" class="sr6cw-help-btn" aria-label="{{label}} references">?</button>
+                    <span class="sr6cw-tip" role="tooltip">
+                        <button type="button" class="sr6cw-cite" data-action="book" data-book="{{cite.book}}" data-page="{{cite.page}}">{{cite.label}} p. {{cite.page}}</button>
+                    </span>
                 </span>
                 {{/if}}
                 </div>

@@ -71,7 +71,7 @@ async function renderPage(state, actor) {
     if (id === "weapon-detail") return weaponDetail(actor, state.data);
     if (id === "weapon-mods") return weaponCatalog(actor, state.data, "weaponMods");
     if (id === "weapon-ammo") return weaponCatalog(actor, state.data, "ammunition");
-    if (id === "cyber") return cyberPage(actor, state.data);
+    if (id === "cyber") return cyberPage(actor);
     if (id === "programs") return programsPage(actor, state.data);
     if (id === "awards") return awardsPage(actor, state.data);
     if (id === "hygiene") return hygienePage(actor);
@@ -153,20 +153,20 @@ function karmaHub(actor) {
                     go: "karma-spec", cite: core(92),
                 }),
                 choice("Initiation / submersion", "10 + current grade or level.", { go: "karma-magic", cite: core(166) }),
-                choice("Buy a quality", "2 × listed Karma cost. Search qualities-normal.", {
-                    go: "karma-buy", pack: "qualities", kind: "quality", cite: core(68),
+                choice("Buy a quality", "2 × listed Karma cost. Opens the shared catalog.", {
+                    action: "browse-karma", pack: "qualities", kind: "quality", cite: core(68),
                 }),
                 choice("Buy off a negative quality", "2 × listed Karma cost. Removes the quality item.", {
                     go: "karma-qualities", cite: core(68),
                 }),
                 choice("Learn a spell", "5 Karma, then the learning time is a table call.", {
-                    go: "karma-buy", pack: "spells", kind: "spell", cite: core(130),
+                    action: "browse-karma", pack: "spells", kind: "spell", cite: core(130),
                 }),
                 choice("Learn a complex form", "5 Karma.", {
-                    go: "karma-buy", pack: "forms", kind: "form", cite: core(189),
+                    action: "browse-karma", pack: "forms", kind: "form", cite: core(189),
                 }),
                 choice("Learn an adept power", "Power point cost stays on the item; Karma for new powers is a table call if your table charges it.", {
-                    go: "karma-buy", pack: "adept", kind: "adept", cite: core(156),
+                    action: "browse-karma", pack: "adept", kind: "adept", cite: core(156),
                 }),
                 choice("Metamagic / echo", "After initiation or submersion, add the item on the sheet. Catalog packs for those are thin; confirm grade at the table.", {
                     disabled: true, cite: core(166),
@@ -469,17 +469,17 @@ function buyHub(actor) {
         leadCite: core(246),
         groups: [{
             choices: [
-                choice("Weapons", "After purchase you can outfit the new weapon with mods and ammo.", {
-                    go: "buy-search", pack: "weapons", cite: core(246),
+                choice("Weapons", "Catalog picker. After purchase you can outfit the new weapon.", {
+                    action: "browse-buy", pack: "weapons", preset: "weapons-unowned", cite: core(246),
                 }),
                 choice("Outfit a weapon on the sheet", "Pick an owned weapon, then browse matching mods or ammo.", {
                     go: "weapon", cite: core(259),
                 }),
-                choice("Armor", packLabel("armor"), { go: "buy-search", pack: "armor" }),
-                choice("Gear", packLabel("gear"), { go: "buy-search", pack: "gear" }),
-                choice("Software", packLabel("software"), { go: "buy-search", pack: "software", cite: core(184) }),
-                choice("Vehicles", packLabel("vehicles"), { go: "buy-search", pack: "vehicles" }),
-                choice("Drones", packLabel("drones"), { go: "buy-search", pack: "drones" }),
+                choice("Armor", packLabel("armor"), { action: "browse-buy", pack: "armor" }),
+                choice("Gear", packLabel("gear"), { action: "browse-buy", pack: "gear" }),
+                choice("Software", packLabel("software"), { action: "browse-buy", pack: "software", cite: core(184) }),
+                choice("Vehicles", packLabel("vehicles"), { action: "browse-buy", pack: "vehicles" }),
+                choice("Drones", packLabel("drones"), { action: "browse-buy", pack: "drones" }),
                 choice("Augmentations", "Prefer the Cyberware door so Essence is obvious.", {
                     go: "cyber", cite: core(282),
                 }),
@@ -502,7 +502,7 @@ function weaponHub(actor) {
                     go: "weapon-detail", itemId: item.id, cite: core(259),
                 });
             }) : [choice("No weapons on the sheet", "Buy one under Spend nuyen → Weapons.", {
-                go: "buy-search", pack: "weapons",
+                action: "browse-buy", pack: "weapons", preset: "weapons-unowned",
             })],
         }],
     };
@@ -521,11 +521,11 @@ function weaponDetail(actor, data) {
             {
                 heading: "Buy for this weapon",
                 choices: [
-                    choice("Weapon mods", "Search catalog, pay, auto-attach to this weapon.", {
-                        go: "weapon-mods", itemId: weapon.id, pack: "weaponMods", cite: core(259),
+                    choice("Weapon mods", "Opens the catalog, then pays and auto-attaches.", {
+                        action: "browse-mod", itemId: weapon.id, pack: "weaponMods", preset: "weapon-mods", cite: core(259),
                     }),
-                    choice("Ammunition", "Matching ammo sorted first; added to inventory for this weapon.", {
-                        go: "weapon-ammo", itemId: weapon.id, pack: "ammunition", cite: core(250),
+                    choice("Ammunition", "Catalog filtered for owned weapons; added for this gun.", {
+                        action: "browse-ammo", itemId: weapon.id, pack: "ammunition", preset: "ammo-for-owned", cite: core(250),
                     }),
                 ],
             },
@@ -665,33 +665,13 @@ async function catalogBuyPage(actor, data, payWith) {
     };
 }
 
-async function cyberPage(actor, data) {
+async function cyberPage(actor) {
     const installed = actor.items.filter(isAugmentation);
-    const query = data.query || "";
-    const result = data.query ? await searchPack("augmentations", { query }) : { entries: [], short: true };
-    const buyChoices = (result.entries || []).map((entry) => {
-        const price = entry.price || 0;
-        const can = readNuyen(actor) >= price;
-        return choice(entry.name, entry.hint, {
-            action: "buy-nuyen",
-            pack: "augmentations",
-            documentId: entry.id,
-            price: String(price),
-            badge: can ? `−${price.toLocaleString()}¥` : "Blocked",
-            dim: !can,
-            cite: core(282),
-        });
-    });
     return {
         kicker: "Augmentations",
         title: "Install or uninstall ware",
         lead: "Anything with Essence on the sheet counts as installed; Eden subtracts it when preparing the actor. Uninstall deletes the item.",
         leadCite: core(282),
-        search: {
-            query,
-            placeholder: "Search augmentations to buy",
-            pack: "augmentations",
-        },
         groups: [
             {
                 heading: "On the sheet",
@@ -699,18 +679,21 @@ async function cyberPage(actor, data) {
                     item.name,
                     `Essence ${item.system.essence} · ${item.system.type || "ware"}`,
                     { action: "remove-aug", itemId: item.id, badge: "Uninstall", cite: core(282) },
-                )) : [choice("No Essence ware on the sheet", "Buy below or add from the sheet.", { disabled: true })],
+                )) : [choice("No Essence ware on the sheet", "Buy from the catalog below.", { disabled: true })],
             },
             {
                 heading: "Buy and install",
-                note: "Pays nuyen, then adds the item. Grade pricing should already be on the catalog entry.",
-                choices: buyChoices.length ? buyChoices : [
-                    choice("Search to buy", "Type two letters and press Search.", { disabled: true }),
-                ],
-            },
-            {
+                note: "Opens the shared catalog with Essence fit and hide-owned presets. Pays nuyen, then adds the item.",
                 choices: [
-                    choice("Open augmentations pack", "", { action: "pack", pack: "augmentations" }),
+                    choice("Browse augmentations", "Filter by Essence remaining, price, and availability.", {
+                        action: "browse-buy",
+                        pack: "augmentations",
+                        preset: "cyber-fits-essence",
+                        cite: core(282),
+                    }),
+                    choice("Open augmentations pack", "Native Foundry compendium browser.", {
+                        action: "pack", pack: "augmentations",
+                    }),
                 ],
             },
         ],
@@ -759,7 +742,9 @@ function programsPage(actor, data) {
                             deviceId: device.id,
                             dim: slots > 0 && running.length >= slots,
                         },
-                    )) : [choice("No free software", "Buy software from Spend nuyen.", { go: "buy-search", pack: "software" })],
+                    )) : [choice("No free software", "Buy software from Spend nuyen.", {
+                        action: "browse-buy", pack: "software",
+                    })],
                 },
             ],
         };

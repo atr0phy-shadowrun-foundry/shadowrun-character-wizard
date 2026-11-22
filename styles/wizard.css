@@ -409,7 +409,13 @@
 }
 
 .sr6-char-wizard .sr6cw-tip button {
-    margin-top: 0.45rem;
+    margin-top: 0;
+}
+
+.sr6-char-wizard .sr6cw-choice-row .sr6cw-tip {
+    left: auto;
+    right: 0;
+    width: min(20rem, calc(100vw - 4rem));
 }
 
 .sr6-char-wizard .sr6cw-search {
